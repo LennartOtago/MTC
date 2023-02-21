@@ -27,7 +27,8 @@ for n in range(number_samples-1):
 
 
 
-
+#stencil
+stencil = [[0, -1, 0],[-1, 4, -1],[0, -1, 0]]
 
 
 #build data structure
@@ -68,9 +69,22 @@ for i in range(siz):
         L[int(neigbours[i,n]),i] = -1
 
 #create one fourier basis vector
-        F_bas = np.zeros(siz, dtype = 'csingle' )
-        for m in range(siz):
-                       F_bas[m] = np.exp(-2j * np.pi * (m +1) / img_siz)
+F_basM = np.zeros((img_siz,img_siz), dtype = 'csingle' )
+for m in range(img_siz):
+    for i in range(img_siz):
+        for l in range(img_siz):
+            for k in range(img_siz):
+                #G[l,k] F[n,m,i]
+
+                F_basM[m,i] = 1 * np.exp(-2j * np.pi * (m * 2 + i * 2) / img_siz) #/ img_siz
+F_bas = F_basM.flatten()
+F_bas2 = np.zeros(siz, dtype = 'csingle' )
+for m in range(siz):
+               F_bas2[m] = np.exp(-2j * np.pi * (m +1) / img_siz)
+
+F_bas3 = np.zeros(siz, dtype = 'csingle' )
+for m in range(siz):
+               F_bas3[m] = np.exp(-2j * np.pi * (m +2) / img_siz)
 
 #create fourier matrix for each pixel
 F = np.zeros((siz,img_siz,img_siz), dtype = 'csingle')
@@ -87,24 +101,20 @@ for n in range(siz):
         G = np.reshape(G_vec, (img_siz, img_siz))
         print(G_vec)
         #FFT = np.zeros((img_siz, img_siz))
+        for l in range(img_siz):
+            for k in range(img_siz):
+                for m in range(img_siz):
+                    for i in range(img_siz):
 
-        for m in range(img_siz):
-            for i in range(img_siz):
-                for l in range(img_siz):
-                    for k in range(img_siz):
                         #G[l,k] F[n,m,i]
 
-                        F[n,m,i] = 1 * np.exp(-2j * np.pi * (m * l + i * k) / img_siz) #/ img_siz
+                        F[n,m,i] =  np.exp(-2j * np.pi * (m * l + i * k + n) / img_siz) #/ img_siz
 
-        Four_vec = F[n].T.flatten()
+        Four_vec = F[n].flatten()
         W[n] = G_vec * Four_vec
-# W = np.ndarray(shape = (siz,siz), dtype = 'csingle')
-# W_trans = np.zeros((siz,siz))
-# for m in range(siz):
-#     for n in range(siz):
-#         W[m,n] =  np.exp( 2j * np.pi * m * n / siz) #/ np.sqrt(siz)
-# W_trans =   W.T.conj() #/ np.sqrt(siz)
 
+
+u,s,vh = np.linalg.svd(L)
 
 V = np.zeros((siz,siz), dtype = 'csingle')
 for n in range(siz):
