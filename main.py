@@ -67,7 +67,7 @@ for i in range(siz):
         L[int(neigbours[i,n]),i] = -1
 
 #create fourier matrix for each pixel
-F = np.zeros((siz,img_siz,img_siz))
+F = np.zeros((siz,img_siz,img_siz), dtype = 'csingle')
 
 n = 0
 for n in range(siz):
@@ -84,11 +84,24 @@ for n in range(siz):
             for i in range(img_siz):
                 for l in range(img_siz):
                     for k in range(img_siz):
-                        F[n,m,i] = F[n,m,i] + G[l,k] * np.exp(-2j * np.pi * (m * l + i * k)/ img_siz) / img_siz
+                        #G[l,k]
+                        F[n,m,i] = F[n,m,i] + 1 * np.exp(-2j * np.pi * (m * l + i * k)/ img_siz) / img_siz
 
 
-v_0 = F[0].T.flatten()
 
-Z = np.matmul(L,v_0)
+W = np.ndarray(shape = (siz,siz), dtype = 'csingle')
+W_trans = np.zeros((siz,siz))
+for m in range(siz):
+    for n in range(siz):
+        W[m,n] =  np.exp( 2j * np.pi * m * n / siz) / np.sqrt(siz)
 
+W_trans =   W.T.conj() / np.sqrt(siz)
+
+
+v_0 = F[0].T.flatten().real
+
+Z = np.matmul(L,v_0).real
+
+Z2 = np.matmul(L,W[:,1]).real
+c = W[:,1].real
 print('debugggg')
