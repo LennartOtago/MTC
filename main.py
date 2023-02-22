@@ -1,132 +1,120 @@
 import numpy as np
 import numpy.random as rd
+from functions import *
 from numpy.fft import fft2, ifft2
+import matplotlib.image as mpimg
+from numpy.random import normal
+import matplotlib.pyplot as plt
+
+#build data structure
+# siz = 9
+# img_siz = int(np.sqrt(siz))
+# numb_neig = 4
+# neigbors = gen_neigborhood(siz, numb_neig)
+# L,D,Q = gen_and_diag_L(siz, neigbors, numb_neig)
+
+# X = np.zeros((500,256,256))
+#
+# for x in range(500):
+#     X[x] = sample_laplacian(256)
+
+# intialize data
+gray_img = mpimg.imread('jupiter1.tif')
+
+org_img = np.array(gray_img)
+Y = fft2(org_img)
+
+# get psf from satellite
+xpos = 234
+ypos = 85  # Pixel at centre of satellite
+sat_img_org = org_img[ypos - 16: ypos + 16, xpos - 16:xpos + 16]
+sat_img = sat_img_org / (sum(sum(sat_img_org)))
+sat_img[sat_img < 0.05*np.max(sat_img)] = 0
+A = fft2(sat_img, (256,256))
+
+#stencil for laplacian
+stencil = [[0, -1, 0],[-1, 4, -1],[0, -1, 0]]
+L_fft = fft2(stencil,(256,256))
+
 #initialize first samples
 number_samples = 100
 gammas = np.zeros(number_samples)
 etas = np.zeros(number_samples)
-accept_ratio = np.zeros(number_samples)
+accept_ratio = np.zeros(number_samples-1)
 
 gammas[0] = 0.218
 etas[0] = 5.15e-5
-
+gammas[-1] = 0.218
+etas[-1] = 5.15e-5
 
 #draw new sample with normal prob
 
 std_eta = 17.28e-7
 std_gamma = 2.34e-3
-
+k = 0
 for n in range(number_samples-1):
+
+    #sample new hyperparmeters
     gammas[n+1] = rd.normal(gammas[n], std_gamma)
     etas[n+1] = rd.normal(etas[n], std_eta)
 
-#calculate acceptance ratio
+    #calculate log determinant g and f
+    lam_old = etas[n]/gammas[n]
+    f_old = f(Y,lam_old,L_fft,A).real
+    g_old = g(A, lam_old,L_fft).real
+
+    lam_new = etas[n+1] / gammas[n+1]
+    f_new = f(Y, lam_new, L_fft, A).real
+    g_new = g(A, lam_new, L_fft).real
+
+    #calculate acceptance ratio
+
+    ratio = (np.log(etas[n+1]) - np.log(etas[n])) * 256**2/2 - g_new/2 - gammas[n+1] * f_new / 2 + g_old/2 + gammas[n] * f_old /2 \
+            + (gammas[n+1] - gammas[n])**2 - (gammas[n] - gammas[n-1])**2 + (etas[n+1] - etas[n])**2 - (etas[n] - etas[n-1])**2
+
+    accept_ratio[n] =  abs(np.exp(ratio))
+    while rd.uniform() > abs(np.exp(ratio)):
+        print("new state rejected")
+        k = k+1
+        gammas[n + 1] = rd.normal(gammas[n], std_gamma)
+        etas[n + 1] = rd.normal(etas[n], std_eta)
+
+        lam_new = etas[n + 1] / gammas[n + 1]
+        f_new = f(Y, lam_new, L_fft, A).real
+        g_new = g(A, lam_new, L_fft).real
+        ratio = (np.log(etas[n+1]) - np.log(etas[n])) * 256**2/2 - g_new/2 - gammas[n+1] * f_new / 2 + g_old/2 + gammas[n] * f_old /2 \
+            #+ (gammas[n+1] - gammas[n])**2 - (gammas[n] - gammas[n-1])**2 + (etas[n+1] - etas[n])**2 - (etas[n] - etas[n-1])**2
+        accept_ratio[n] =  abs(np.exp(ratio))
 
 
+    #sample new image
+    #v_rd = normal(0, 1, 256 ** 2).reshape((256, 256))
+    #W = np.sqrt(gammas[n+1]) * np.conj(A) * fft2(v_rd) + np.sqrt(etas[n+1]) * fft2(sample_laplacian(256))
+
+plt.figure()
+plt.subplot(3,1,1)
+plt.hist(gammas)
+plt.subplot(3,1,2)
+plt.hist(etas)
+plt.subplot(3,1,3)
+plt.hist(etas/gammas)
+plt.show()
 
 
-
-
-#stencil
-stencil = [[0, -1, 0],[-1, 4, -1],[0, -1, 0]]
-
-
-#build data structure
-siz = 9
-img_siz = int(np.sqrt(siz))
-numb_neig = 4
-
-neigbours = np.zeros((siz,numb_neig))
-
-for n in range(siz):
-
-    #right neigbour
-
-    if (n + 1) % img_siz == 0:
-        neigbours[n, 0] = n - img_siz + 1
-    else:
-        neigbours[n,0] = n + 1
-    #left neighbour
-    if (n-1)% img_siz == img_siz-1:
-        neigbours[n, 1] = n + img_siz - 1
-    else:
-        neigbours[n,1] = n - 1
-
-    #up neigbour
-    neigbours[n,2] = (n - img_siz) % siz
-
-    #down neigbour
-    neigbours[n,3] = (n + img_siz )% siz
-
-
-L = np.zeros((siz,siz)) + numb_neig * np.identity(siz)
-
-
-#build lalplacian matrix
-for i in range(siz):
-    for n in range(numb_neig):
-        L[i,int(neigbours[i,n])] = -1
-        L[int(neigbours[i,n]),i] = -1
-
-#create one fourier basis vector
-F_basM = np.zeros((img_siz,img_siz), dtype = 'csingle' )
-for m in range(img_siz):
-    for i in range(img_siz):
-        for l in range(img_siz):
-            for k in range(img_siz):
-                #G[l,k] F[n,m,i]
-
-                F_basM[m,i] = 1 * np.exp(-2j * np.pi * (m * 2 + i * 2) / img_siz) #/ img_siz
-F_bas = F_basM.flatten()
-F_bas2 = np.zeros(siz, dtype = 'csingle' )
-for m in range(siz):
-               F_bas2[m] = np.exp(-2j * np.pi * (m +1) / img_siz)
-
-F_bas3 = np.zeros(siz, dtype = 'csingle' )
-for m in range(siz):
-               F_bas3[m] = np.exp(-2j * np.pi * (m +2) / img_siz)
-
-#create fourier matrix for each pixel
-F = np.zeros((siz,img_siz,img_siz), dtype = 'csingle')
-W = np.zeros((siz,siz), dtype = 'csingle')
-
-n = 0
-for n in range(siz):
-
-        G_vec = np.zeros(siz)
-        G_vec[n] = numb_neig
-
-        for x in range(numb_neig):
-            G_vec[int(neigbours[n,x])] = -1
-        G = np.reshape(G_vec, (img_siz, img_siz))
-        print(G_vec)
-        #FFT = np.zeros((img_siz, img_siz))
-        for l in range(img_siz):
-            for k in range(img_siz):
-                for m in range(img_siz):
-                    for i in range(img_siz):
-
-                        #G[l,k] F[n,m,i]
-
-                        F[n,m,i] =  np.exp(-2j * np.pi * (m * l + i * k + n) / img_siz) #/ img_siz
-
-        Four_vec = F[n].flatten()
-        W[n] = G_vec * Four_vec
-
-
-u,s,vh = np.linalg.svd(L)
-
-V = np.zeros((siz,siz), dtype = 'csingle')
-for n in range(siz):
-    V[:,n] = F[n].T.flatten()
-
-v_0 = np.diag(V) * np.identity(siz)
-
-
-Z = np.matmul(L, np.diag(V)).real
-
-Z2 = np.matmul(L, V[:,3]).real
-
-eig_val, eig_vec = np.linalg.eig(L)
+lam = np.logspace(-10,5,150)
+y = np.array([(f(Y,lamba,L_fft,A)) for lamba in lam ])
+fig2 = plt.figure()
+ax = fig2.add_subplot()
+plt.plot(lam,y.real)
+ax.set_xscale('log')
+ax.set_yscale('log')
+plt.show()
+#
+# fig3 = plt.figure()
+# ax = fig3.add_subplot()
+# plt.plot(lam,[(g(A,lamba,L_fft)).real for lamba in lam ] )
+# ax.set_xscale('log')
+# #ax.set_yscale('log')
+# plt.show()
 
 print('debugggg')
