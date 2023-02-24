@@ -1,5 +1,5 @@
 import numpy as np
-from numpy.random import normal
+from numpy.random import normal,  multivariate_normal
 
 def gen_and_diag_L(siz, neigbours, numb_neig):
 
@@ -74,11 +74,11 @@ def gen_neigborhood(siz, numb_neig):
     return neigbors
 
 def f(Y,lam,L,A):
-    return sum(sum(abs(Y)**2 * lam * L/abs(A)**2/(1 + lam * L/ abs(A)**2) ))/256**2
+    return sum(sum(  abs(Y)**2 * lam * abs(L)/ abs(A)**2  / (1 + lam * abs(L) / abs(A)**2) ) )  /256**2
 
 
 def g(A,lam,L):
-    return  sum(sum(np.log(abs(A)**2 ))) + sum(sum(np.log(1 + lam * L/abs(A)**2) ))#-(256**2)
+    return  sum(sum(np.log(abs(A)**2 ))) + sum(sum(np.log(1 + lam * abs(L)/abs(A)**2) ))#-(256**2)
 
 
 def sample_laplacian(siz_of_img):
@@ -86,29 +86,31 @@ def sample_laplacian(siz_of_img):
     # sample from Laplacian matrix in this case with variance 4 and 0 mean
     # original L L_org = np.array([[ 0, -1, 0],[ -1, 4, -1],[ 0, -1, 0]])
     # ***
+    mean = (0, 0)
+    cov = [[1, 0], [0, 1]]
 
     v = np.zeros((siz_of_img, siz_of_img))
     # top to bottom first row
     for i in range(0, siz_of_img):
-        rand_num = np.array([-1, 1]) * normal(0, 1)#np.sqrt(2))#(1 / np.sqrt(2)) *
+        rand_num = np.array([-1, 1]) * normal(0, 1,2)#multivariate_normal(mean, cov)#normal(0, 1)#np.sqrt(2))#(1 / np.sqrt(2)) *
         v[0, i], v[-1, i] = [v[0, i], v[-1, i]] + np.array(rand_num)
 
     for j in range(0, siz_of_img):
         for i in range(0, siz_of_img - 1):
-            rand_num =  np.array([-1, 1]) * normal(0, 1)#(1 / np.sqrt(2)) *
+            rand_num =  np.array([-1, 1]) *normal(0, 1,2)# multivariate_normal(mean, cov)#normal(0, 1)#(1 / np.sqrt(2)) *
             v[j, i], v[j, i + 1] = [v[j, i], v[j, i + 1]] + np.array(rand_num)
 
     # all normal up and down neighbours
 
     for j in range(0, siz_of_img - 1):
         for i in range(0, siz_of_img):
-            rand_num =  np.array([-1, 1]) * normal(0,1)#np.sqrt(2))#(1 / np.sqrt(2)) *
+            rand_num =  np.array([-1, 1]) *normal(0, 1,2)# multivariate_normal(mean, cov)#normal(0,1)#np.sqrt(2))#(1 / np.sqrt(2)) *
             v[j, i], v[j + 1, i] = [v[j, i], v[j + 1, i]] + np.array(rand_num)
 
     # all left right boundaries neighbours
 
     for i in range(0, siz_of_img):
-        rand_num =  np.array([-1, 1]) * normal(0,1)# np.sqrt(2))#(1 / np.sqrt(2))
+        rand_num =  np.array([-1, 1]) * normal(0, 1,2)#multivariate_normal(mean, cov)#normal(0,1)# np.sqrt(2))#(1 / np.sqrt(2))
         v[i, 0], v[i, -1] = [v[i, 0], v[i, -1]] + np.array(rand_num)
 
     return v
