@@ -114,3 +114,47 @@ def sample_laplacian(siz_of_img):
         v[i, 0], v[i, -1] = [v[i, 0], v[i, -1]] + np.array(rand_num)
 
     return v
+
+'''
+Calculates the autocorrelation curve of M, then returns the integrated 
+autocorrelation time (IAC).
+'''
+def tau(M,kappa):
+#   autocorr is the UNintegrated autocorrelation curve
+    autocorr = auto_corr_fast(M,kappa)
+#   tau = 1 + 2*sum(G)
+    return 1 + 2*np.sum(autocorr), autocorr
+
+'''
+This is the intuitive and naive way to calculate autocorrelations. See
+auto_corr_fast(...) instead.
+'''
+def auto_corr(M,kappa):
+#   The autocorrelation has to be truncated at some point so there are enough
+#   data points constructing each lag. Let kappa be the cutoff
+    auto_corr = np.zeros(kappa-1)
+    mu = np.mean(M)
+    for s in range(1,kappa-1):
+        auto_corr[s] = np.mean( (M[:-s]-mu) * (M[s:]-mu) ) / np.var(M)
+    return auto_corr
+
+'''
+The bruteforce way to calculate autocorrelation curves is defined in 
+auto_corr(M). The correlation is computed for an array against itself, and 
+then the indices of one copy of the array are shifted by one and the 
+procedure is repeated. This is a typical "convolution-style" approach. 
+An incredibly faster method is to Fourier transform the array first, since 
+convolutions in Fourier space is simple multiplications. This is the approach
+in auto_corr_fast(...)
+'''
+def auto_corr_fast(M,kappa):
+#   The autocorrelation has to be truncated at some point so there are enough
+#   data points constructing each lag. Let kappa be the cutoff
+    M = M - np.mean(M)
+    N = len(M)
+    fvi = np.fft.fft(M, n=2*N)
+#   G is the autocorrelation curve
+    G = np.real( np.fft.ifft( fvi * np.conjugate(fvi) )[:N] )
+    G /= N - np.arange(N); G /= G[0]
+    G = G[:kappa]
+    return G
