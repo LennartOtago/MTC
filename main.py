@@ -1,12 +1,43 @@
 import numpy as np
 import numpy.random as rd
 from functions import *
-
+import numpy as np
 from numpy.fft import fft2, ifft2
 import matplotlib.image as mpimg
 from numpy.random import normal,  multivariate_normal
 import matplotlib.pyplot as plt
 
+def sample_from_laplacian(siz_of_img):
+    # ***
+    # sample from Laplacian matrix in this case with variance for and zero mean
+    # original L L_org = np.array([[ 0, -1, 0],[ -1, 4, -1],[ 0, -1, 0]])
+    # ***
+
+    v = np.zeros((siz_of_img, siz_of_img))
+    # top to bottom first row
+    for i in range(0, siz_of_img):
+        rand_num = (1 / np.sqrt(2)) * np.array([-1, 1]) * rd.normal(0, np.sqrt(2))
+        v[0, i], v[-1, i] = [v[0, i], v[-1, i]] + np.array(rand_num)
+
+    for j in range(0, siz_of_img):
+        for i in range(0, siz_of_img - 1):
+            rand_num = (1 / np.sqrt(2)) * np.array([-1, 1]) * rd.normal(0, np.sqrt(2))
+            v[j, i], v[j, i + 1] = [v[j, i], v[j, i + 1]] + np.array(rand_num)
+
+    # all normal up and down neighbours
+
+    for j in range(0, siz_of_img - 1):
+        for i in range(0, siz_of_img):
+            rand_num = (1 / np.sqrt(2)) * np.array([-1, 1]) * rd.normal(0, np.sqrt(2))
+            v[j, i], v[j + 1, i] = [v[j, i], v[j + 1, i]] + np.array(rand_num)
+
+    # all left right boundaries neighbours
+
+    for i in range(0, siz_of_img):
+        rand_num = (1 / np.sqrt(2)) * np.array([-1, 1]) * rd.normal(0, np.sqrt(2))
+        v[i, 0], v[i, -1] = [v[i, 0], v[i, -1]] + np.array(rand_num)
+
+    return v
 #build data structure
 # siz = 9
 # img_siz = int(np.sqrt(siz))
@@ -39,7 +70,7 @@ stencil = [[0, -1, 0],[-1, 4, -1],[0, -1, 0]]
 L_fft = fft2(stencil,(256,256))
 
 #initialize first samples
-number_samples = 5000
+number_samples = 1000
 kappa = 1000
 gammas = np.zeros(number_samples)
 etas = np.zeros(number_samples)
@@ -64,8 +95,8 @@ res_img[0] = ifft2(
 
 #draw new sample with normal prob
 
-std_eta = 17.28e-7/2
-std_gamma = 2.34e-3/2
+std_eta = 17.28e-7
+std_gamma = 2.34e-3
 k = 0
 for n in range(number_samples-1):
 
@@ -117,32 +148,32 @@ burn = 20
 
 #calculate autocorrelation function
 
-auto1 = auto_corr_fast(etas[burn::]/gammas[burn::],kappa)
-auto3 = auto_corr(etas[burn::]/gammas[burn::],kappa)
-tau = tau(etas[burn::]/gammas[burn::],kappa)
+# auto1 = auto_corr_fast(etas[burn::]/gammas[burn::],kappa)
+# auto3 = auto_corr(etas[burn::]/gammas[burn::],kappa)
+# tau = tau(etas[burn::]/gammas[burn::],kappa)
+#
+# plt.figure()
+# ax = plt.subplot()
+# plt.plot(auto1)
+# ax.set_xlim([0,40])
+# ax.set_ylim([-0.2,1])
+# #plt.show()
+#
+# import statsmodels.api as sm
+# nlags = number_samples-burn-1#int(number_samples/10)
+# auto_eta  = sm.tsa.acf(etas[burn::], nlags=nlags)
+# auto_gamma  = sm.tsa.acf(gammas[burn::], nlags=nlags)
+# auto_lam = sm.tsa.acf(etas[burn::]/gammas[burn::], nlags=nlags)
+# int_eta = 1 + 2 * sum(auto_eta)
+# int_gamma = 1 + 2 * sum(auto_gamma)
+# int_lam = 1 + 2 * sum(auto_lam)
 
-plt.figure()
-ax = plt.subplot()
-plt.plot(auto1)
-ax.set_xlim([0,40])
-ax.set_ylim([-0.2,1])
-#plt.show()
-
-import statsmodels.api as sm
-nlags = number_samples-burn-1#int(number_samples/10)
-auto_eta  = sm.tsa.acf(etas[burn::], nlags=nlags)
-auto_gamma  = sm.tsa.acf(gammas[burn::], nlags=nlags)
-auto_lam = sm.tsa.acf(etas[burn::]/gammas[burn::], nlags=nlags)
-int_eta = 1 + 2 * sum(auto_eta)
-int_gamma = 1 + 2 * sum(auto_gamma)
-int_lam = 1 + 2 * sum(auto_lam)
-
-plt.figure()
-ax = plt.subplot()
-plt.plot(np.linspace(0,nlags,nlags+1),auto_lam)
-ax.set_ylim([-0.2, 1])
-ax.set_xlim([0, 40])
-plt.show()
+# plt.figure()
+# ax = plt.subplot()
+# plt.plot(np.linspace(0,nlags,nlags+1),auto_lam)
+# ax.set_ylim([-0.2, 1])
+# ax.set_xlim([0, 40])
+# plt.show()
 
 plt.figure()
 ax1 = plt.subplot(3,1,1)
@@ -180,6 +211,30 @@ np.savetxt('samples.txt', np.vstack((etas,gammas)).T, header = 'etas \t gammas',
 # plt.figure(4)
 # plt.scatter(L_fft.real,L_fft.imag)
 # plt.show()
+
+#sample image based on mtc hyperprior samples
+norm_f = np.zeros(4)
+norm_data = np.zeros(4)
+
+for n in range(0,4):
+    v_2 = sample_from_laplacian(256)
+    v_rd = rd.normal(0, 1, 256 ** 2).reshape((256, 256))
+    W = np.sqrt(np.mean(gammas[burn::])) * np.conj(A) * fft2(v_rd) + np.sqrt(np.mean(etas[burn::]) ) * fft2(v_2)
+    IMG_STORE = (np.mean(gammas[burn::]) * Y * np.conj(A) + W) / (
+            np.mean(etas[burn::]) * abs(L_fft) + np.mean(gammas[burn::]) * abs(A) ** 2)
+
+    #calc norm for L_curve
+
+    norm_f[n] = np.sqrt(sum(sum( (IMG_STORE.conj() * abs(L_fft) * IMG_STORE).real))) / 256
+    norm_data[n] = np.linalg.norm(ifft2(Y - IMG_STORE * A))
+
+plt.imshow(ifft2(IMG_STORE).real, cmap='gray')
+plt.show()
+
+#save norm
+np.savetxt('norms.txt', np.vstack((norm_data,norm_f)).T, header = '||y-Ax|| \t sqrt(x^TLx)', fmt = '%.15f \t %.15f')
+
+
 
 print(np.mean(accept_ratio[accept_ratio < 1]))
 print('debugggg')
